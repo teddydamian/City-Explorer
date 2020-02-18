@@ -35,6 +35,33 @@ function City(city, obj){
   this.longitude = obj.lon;
 }
 
+
+app.get('/weather', (request, response) => {
+  try{
+    // let city = request.query.city;
+    let weatherArr = [];
+    let darksky = require('./data/darksky.json');
+    let weather = request.query.city;
+
+    for (let i = 0; i < darksky.daily.data.length ; i++){
+      let newWeather = new Weather(darksky, i);
+      weatherArr.push(newWeather)
+    }
+    response.send(weatherArr);
+  }
+  catch (err){
+    console.log(err);
+  }
+})
+
+function Weather(obj, index){
+  let date = new Date(obj.daily.data[index].time)
+  this.forecast = obj.daily.data[index].summary;
+  this.time = date.toDateString();
+}
+
+
+
 // turn on the server
 app.listen(PORT, () => {
   console.log(`listening to ${PORT}`);
