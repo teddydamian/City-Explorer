@@ -43,14 +43,25 @@ app.get ('*', (request, response)=> {
 
 app.get('/weather', (request, response) => {
   let {latitude, longitude} = request.query;
-  let url = `https://api.darksky.net/forecast/${process.env.GEOCODE_API}/${latitude},${longitude}`;
+  let url = `https://api.darksky.net/forecast/${process.env.DARKSKY_API}/${latitude},${longitude}`;
+  console.log(process.env.DARKSKY_API);
   superagent.get(url)
     .then(results => {
       let weatherResults = results.body.daily.data;
-      let newWeatherArray = newWeatherArray.map(new Weather(weatherResults))
-      response.send(newWeatherArray)
+      let newWeatherArray = weatherResults.map((day) => (new Weather(day)))
+      response.send(newWeatherArray);
     })
 })
+
+
+function Weather(obj){
+  this.time = new Date(obj.time * 1000).toDateString();
+  this.forecast = obj.summary;
+}
+
+
+
+
 
 // weatherArray.forEach(day => {
 
@@ -73,12 +84,6 @@ app.get('/weather', (request, response) => {
 // }
 // })
 
-
-function Weather(obj, index){
-  let date = new Date(obj.daily.data[index].time)
-  this.forecast = obj.daily.data[index].summary;
-  this.time = date.toDateString();
-}
 
 
 
