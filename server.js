@@ -2,16 +2,13 @@
 
 // brings in the expresss library which is our server
 const express = require('express');
-
-// instantiates the express library in app
 const app = express();
+const superagent = require('superagent');
 
-// lets us go into the .env and get the variables
-require('dotenv').config();
-
-// the policeman - lets the server know that it is OK to give information to the front end
 const cors = require('cors');
 app.use(cors())
+
+require('dotenv').config();
 
 // get the port from the env
 const PORT = process.env.PORT || 3001;
@@ -19,9 +16,13 @@ const PORT = process.env.PORT || 3001;
 app.get('/location', (request, response) => {
   try{
     let city = request.query.city;
-    let geoData = require('./data/geo.json');
-    let location = new City(city, geoData[0])
-    response.send(location);
+    let url = `https://us1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API}&q=${city}&format=json`;
+    superagent.get(url)
+      .then(results => {
+        let geoData = results.body;
+        let location = new City(city, geoData[0]);
+        response.status(200).send(location);
+      })
   }
   catch (err){
     console.log(err);
@@ -35,30 +36,50 @@ function City(city, obj){
   this.longitude = obj.lon;
 }
 
+app.get ('*', (request, response)=> {
+  response.status(404).send('Error 404');
+})
+
 
 app.get('/weather', (request, response) => {
-  try{
-    // let city = request.query.city;
-    let weatherArr = [];
-    let darksky = require('./data/darksky.json');
-    let weather = request.query.city;
-
-    for (let i = 0; i < darksky.daily.data.length ; i++){
-      let newWeather = new Weather(darksky, i);
-      weatherArr.push(newWeather)
-    }
-    response.send(weatherArr);
-  }
-  catch (err){
-    console.log(err);
-  }
+  let {latitude, longitude} = request.query;
+  let url = `https://api.darksky.net/forecast/${process.env.GEOCODE_API}/${latitude},${longitude}`;
+  superagent.get(url)
+    .then(results => {
+      let weatherResults = results.body.daily.data;
+      let newWeatherArray = newWeatherArray.map(new Weather(weatherResults))
+      response.send(newWeatherArray)
+    })
 })
+
+// weatherArray.forEach(day => {
+
+// })
+
+// try{
+// let city = request.query.city;
+// let weatherArr = [];
+// let darksky = require('./data/darksky.json');
+// let weather = request.query.city;
+
+// for (let i = 0; i < darksky.daily.data.length ; i++){
+//   let newWeather = new Weather(darksky, i);
+//   weatherArr.push(newWeather)
+// }
+// response.send(weatherArr);
+// }
+// catch (err){
+//   console.log(err);
+// }
+// })
+
 
 function Weather(obj, index){
   let date = new Date(obj.daily.data[index].time)
   this.forecast = obj.daily.data[index].summary;
   this.time = date.toDateString();
 }
+
 
 
 
