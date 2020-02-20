@@ -1,9 +1,13 @@
 'use strict'
 
-// brings in the expresss library which is our server
+// brings in the libraries which is our server
 const express = require('express');
 const app = express();
 const superagent = require('superagent');
+const pg = require('pg');
+
+const client = new pg.Client(process.env.DATABASE_URL);
+// client.on('error', err => console.error(err));
 
 const cors = require('cors');
 app.use(cors())
@@ -13,21 +17,47 @@ require('dotenv').config();
 // get the port from the env
 const PORT = process.env.PORT || 3001;
 
+
+
+
 app.get('/location', (request, response) => {
-  try{
-    let city = request.query.city;
-    let url = `https://us1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API}&q=${city}&format=json`;
+  // try{
+  let city = request.query.city;
+  let url = `https://us1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API}&q=${city}&format=json`;
+
+  if (!checkDatabase(city)) {
     superagent.get(url)
       .then(results => {
-        let geoData = results.body;
-        let location = new City(city, geoData[0]);
+        let geoData = results.body[0];
+        let location = new City(city, geoData);
         response.status(200).send(location);
       })
+      // .catch(() => {
+      //   console.error('Theres an error');
+      // });
   }
-  catch (err){
-    console.log(err);
-  }
+  else {response.send(checkDatabase(city))}
+  // catch (err){
+  //   console.log(err);
+  // }
 })
+
+
+
+const checkDatabase = function (city) {
+  let SQL = 'SELECT * FROM location WHERE search_query LIKE ($1)';
+  // console.log('checking DB')
+  let safeValue = [city];
+  client.query(SQL, safeValue)
+    .then(results => {
+      console.log(results);
+      return results.rows;
+    })
+    .catch(err =>{
+      console.log(err)
+    })
+}
+
 
 
 app.get('/weather', (request, response) => {
@@ -65,6 +95,7 @@ function City(city, obj){
   this.formatted_query = obj.display_name;
   this.latitude = obj.lat;
   this.longitude = obj.lon;
+  this.insertData();
 }
 
 function Weather(obj){
@@ -85,34 +116,24 @@ function Trail(obj){
   this.condition_time = obj.conditionDate.slice(11,19);
 }
 
-// weatherArray.forEach(day => {
-
-// })
-
-// try{
-// let city = request.query.city;
-// let weatherArr = [];
-// let darksky = require('./data/darksky.json');
-// let weather = request.query.city;
-
-// for (let i = 0; i < darksky.daily.data.length ; i++){
-//   let newWeather = new Weather(darksky, i);
-//   weatherArr.push(newWeather)
-// }
-// response.send(weatherArr);
-// }
-// catch (err){
-//   console.log(err);
-// }
-// })
-
-
-
 app.get ('*', (request, response)=> {
   response.status(404).send('Error 404');
 })
 
 // turn on the server
-app.listen(PORT, () => {
-  console.log(`listening to ${PORT}`);
-})
+// app.listen(PORT, () => {
+//   console.log(`listening to ${PORT}`);
+// })
+
+City.prototype.insertData = function () {
+  let SQL = 'INSERT INTO location (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4)';
+  let safeValues = [this.search_query, this.formatted_query, this.latitude, this.longitude];
+  console.log(safeValues);
+  client.query(SQL, safeValues);
+}
+
+
+client.connect()
+  .then(
+    app.listen(PORT, () => console.log(`listening on ${PORT}`))
+  );
