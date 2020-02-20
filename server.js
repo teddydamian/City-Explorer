@@ -30,9 +30,6 @@ app.get('/location', (request, response) => {
 })
 
 
-
-
-
 app.get('/weather', (request, response) => {
   // console.log(request.query);
   let locationObj = request.query;
@@ -45,6 +42,20 @@ app.get('/weather', (request, response) => {
       let weatherResults = results.body.daily.data;
       let newWeatherArray = weatherResults.map(day => new Weather(day))
       response.send(newWeatherArray);
+    })
+})
+
+app.get('/trails', (request, response) => {
+  let {
+    latitude,
+    longitude, } = request.query;
+
+  let url = `https://www.hikingproject.com/data/get-trails?lat=${latitude}&lon=${longitude}&maxDistance=10&key=${process.env.TRAIL_API_KEY}`;
+
+  superagent.get(url)
+    .then(results => {
+      const dataObj = results.body.trails.map(trail => new Trail(trail));
+      response.status(200).send(dataObj)
     })
 })
 
@@ -61,9 +72,18 @@ function Weather(obj){
   this.forecast = obj.summary;
 }
 
-
-
-
+function Trail(obj){
+  this.name = obj.name;
+  this.location = obj.location;
+  this.length = obj.length;
+  this.stars = obj.stars;
+  this.star_votes = obj.starVotes;
+  this.summary = obj.summary;
+  this.trail_url = obj.url;
+  this.conditions = obj.conditionStatus;
+  this.condition_date = obj.conditionDate.slice(0,10);
+  this.condition_time = obj.conditionDate.slice(11,19);
+}
 
 // weatherArray.forEach(day => {
 
