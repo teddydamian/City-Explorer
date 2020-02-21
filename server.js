@@ -1,62 +1,51 @@
 'use strict'
 
 // brings in the libraries which is our server
+require('dotenv').config();
 const express = require('express');
 const app = express();
 const superagent = require('superagent');
 const pg = require('pg');
 
 const client = new pg.Client(process.env.DATABASE_URL);
-// client.on('error', err => console.error(err));
+client.on('error', err => console.error(err));
 
 const cors = require('cors');
-app.use(cors())
+app.use(cors());
 
-require('dotenv').config();
 
 // get the port from the env
 const PORT = process.env.PORT || 3001;
 
 
-
-
 app.get('/location', (request, response) => {
-  // try{
   let city = request.query.city;
-  let url = `https://us1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API}&q=${city}&format=json`;
 
-  if (!checkDatabase(city)) {
-    superagent.get(url)
-      .then(results => {
-        let geoData = results.body[0];
-        let location = new City(city, geoData);
-        response.status(200).send(location);
-      })
-      // .catch(() => {
-      //   console.error('Theres an error');
-      // });
-  }
-  else {response.send(checkDatabase(city))}
-  // catch (err){
-  //   console.log(err);
-  // }
-})
-
-
-
-const checkDatabase = function (city) {
   let SQL = 'SELECT * FROM location WHERE search_query LIKE ($1)';
-  // console.log('checking DB')
   let safeValue = [city];
   client.query(SQL, safeValue)
     .then(results => {
-      console.log(results);
-      return results.rows;
+      if(results.rows.length > 0){
+        response.send(results.rows[0]);
+      }else{
+        let url = `https://us1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API}&q=${city}&format=json`;
+
+        superagent.get(url)
+          .then(results => {
+            let geoData = results.body[0];
+            let location = new City(city, geoData);
+
+            let SQL = 'INSERT INTO location (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4);';
+
+            let safeValues = [location.search_query, location.formatted_query, location.latitude, location.longitude];
+
+            client.query(SQL, safeValues);
+            response.status(200).send(location);
+
+          }).catch(err => console.error(err));
+      }
     })
-    .catch(err =>{
-      console.log(err)
-    })
-}
+})
 
 
 
@@ -95,7 +84,6 @@ function City(city, obj){
   this.formatted_query = obj.display_name;
   this.latitude = obj.lat;
   this.longitude = obj.lon;
-  this.insertData();
 }
 
 function Weather(obj){
@@ -116,24 +104,17 @@ function Trail(obj){
   this.condition_time = obj.conditionDate.slice(11,19);
 }
 
-app.get ('*', (request, response)=> {
-  response.status(404).send('Error 404');
-})
 
 // turn on the server
 // app.listen(PORT, () => {
 //   console.log(`listening to ${PORT}`);
 // })
 
-City.prototype.insertData = function () {
-  let SQL = 'INSERT INTO location (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4)';
-  let safeValues = [this.search_query, this.formatted_query, this.latitude, this.longitude];
-  console.log(safeValues);
-  client.query(SQL, safeValues);
-}
 
 
 client.connect()
-  .then(
-    app.listen(PORT, () => console.log(`listening on ${PORT}`))
-  );
+  .then(() =>{
+    app.listen(PORT, () => {
+      console.log(`listening on ${PORT}`);
+    })
+  })
